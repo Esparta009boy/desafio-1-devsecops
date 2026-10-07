@@ -1,0 +1,48 @@
+name: CI & DevSecOps Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-and-build:
+    name: Análise de Segurança e Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout do Código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: ⚙️ Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 📦 Instalar Dependências
+        run: npm ci
+
+      - name: 🔍 Auditoria de Pacotes NPM
+        run: npm audit --audit-level=high
+
+      - name: 🔑 Gitleaks (Detecção de Segredos Vazados)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ""
+
+      - name: 🐳 Build da Imagem Docker
+        run: |
+          docker build -t minha-api-node:latest .
+
+      - name: 🛡️ Trivy Scan (Vulnerabilidades na Imagem Docker)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'minha-api-node:latest'
+          format: 'table'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
